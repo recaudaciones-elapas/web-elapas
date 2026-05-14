@@ -3,27 +3,15 @@ import {
   ArrowLeft,
   DollarSign,
   AlertCircle,
-  Loader2,
+  CheckCircle,
   Calendar,
+  Droplet,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface DebtQueryProps {
   onBack: () => void;
-}
-
-interface Client {
-  id_cliente: string;
-  nombre: string;
-  apellido: string;
-  ci: string;
-}
-
-interface Meter {
-  id_medidor: string;
-  codigo: string;
-  id_cliente: string;
 }
 
 interface Factura {
@@ -33,7 +21,7 @@ interface Factura {
   estado: string;
 }
 
-interface DebtResponse {
+interface ConsultaResponse {
   nombre_cliente: string;
   apellido_cliente: string;
   codigo_medidor: string;
@@ -42,185 +30,125 @@ interface DebtResponse {
   facturas: Factura[];
 }
 
-const API_URL =
-  "https://fastapi-app-latest-ride.onrender.com/api/v1";
-
 export function DebtQuery({
   onBack,
 }: DebtQueryProps) {
+
+  const API_BASE =
+    "https://fastapi-app-latest-ride.onrender.com/api/v1";
+
+  const [ci, setCI] =
+    useState("");
+
+  const [codigoMedidor, setCodigoMedidor] =
+    useState("");
+
   const [loading, setLoading] =
     useState(false);
 
-  const [searchTerm, setSearchTerm] =
+  const [error, setError] =
     useState("");
 
-  const [clients, setClients] =
-    useState<Client[]>([]);
+  const [consulta, setConsulta] =
+    useState<ConsultaResponse | null>(null);
 
-  const [meters, setMeters] =
-    useState<Meter[]>([]);
+  // ========================================
+  // BUSCAR DEUDA
+  // ========================================
 
-  // TODAS LAS FACTURAS
-  const [allDebts, setAllDebts] =
-    useState<DebtResponse[]>([]);
+  const handleSearch = async () => {
 
-  // =========================================
-  // CARGAR CLIENTES Y MEDIDORES
-  // =========================================
-
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
     try {
+
       setLoading(true);
 
-      const [clientsRes, metersRes] =
-        await Promise.all([
-          fetch(`${API_URL}/clientes/`),
-          fetch(`${API_URL}/medidores/`),
-        ]);
+      setError("");
 
-      const clientsData =
-        await clientsRes.json();
+      setConsulta(null);
 
-      const metersData =
-        await metersRes.json();
-
-      setClients(
-        Array.isArray(clientsData)
-          ? clientsData
-          : []
-      );
-
-      setMeters(
-        Array.isArray(metersData)
-          ? metersData
-          : []
-      );
-    } catch (error) {
-      console.error(
-        "ERROR CARGANDO:",
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // =========================================
-  // BUSCAR TODAS LAS FACTURAS
-  // =========================================
-
-  const loadAllDebts = async () => {
-    try {
-      setLoading(true);
-
-      const debts: DebtResponse[] = [];
-
-      for (const client of clients) {
-        const meter = meters.find(
-          (m) =>
-            m.id_cliente ===
-            client.id_cliente
-        );
-
-        if (!meter) continue;
-
-        try {
-          const response = await fetch(
-            `${API_URL}/public/consulta-deuda`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-
-              body: JSON.stringify({
-                ci: client.ci,
-                codigo_medidor:
-                  meter.codigo,
-              }),
-            }
-          );
-
-          if (response.ok) {
-            const data =
-              await response.json();
-
-            console.log(
-              "FACTURA:",
-              data
-            );
-
-            debts.push(data);
-          }
-        } catch (error) {
-          console.error(
-            "ERROR CLIENTE:",
-            client.nombre,
-            error
-          );
+      const response = await fetch(
+        `${API_BASE}/public/consulta-deuda`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            ci: ci,
+            codigo_medidor:
+              codigoMedidor,
+          }),
         }
+      );
+
+      if (!response.ok) {
+
+        throw new Error(
+          "No se encontró información del cliente"
+        );
       }
 
-      setAllDebts(debts);
-    } catch (error) {
-      console.error(
-        "ERROR GENERAL:",
-        error
+      const data =
+        await response.json();
+
+      console.log(
+        "CONSULTA:",
+        data
       );
+
+      setConsulta(data);
+
+    } catch (err: any) {
+
+      console.error(err);
+
+      setError(
+        err.message ||
+          "Error al consultar deuda"
+      );
+
     } finally {
+
       setLoading(false);
     }
   };
 
-  // =========================================
-  // FILTRAR
-  // =========================================
-
-  const filteredDebts =
-    allDebts.filter((debt) => {
-      const fullName =
-        `${debt.nombre_cliente} ${debt.apellido_cliente}`;
-
-      return (
-        fullName
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        debt.codigo_medidor
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase())
-      );
-    });
-
-  // =========================================
-  // COLOR ESTADO
-  // =========================================
+  // ========================================
+  // ESTADO
+  // ========================================
 
   const getStatusColor = (
     estado: string
   ) => {
-    switch (
-      estado?.toLowerCase()
+
+    if (
+      estado.toLowerCase() ===
+      "pagado"
     ) {
-      case "pagado":
-        return "bg-green-100 text-green-700";
-
-      case "pendiente":
-        return "bg-red-100 text-red-700";
-
-      default:
-        return "bg-yellow-100 text-yellow-700";
+      return {
+        bg: "bg-green-50",
+        border:
+          "border-green-200",
+        text:
+          "text-green-600",
+        icon: CheckCircle,
+      };
     }
+
+    return {
+      bg: "bg-red-50",
+      border: "border-red-200",
+      text: "text-red-600",
+      icon: AlertCircle,
+    };
   };
 
   return (
+
     <div className="min-h-screen bg-gradient-to-br from-[#f8fbfd] to-[#e3f2fd] p-6">
-      <div className="container mx-auto max-w-7xl">
+
+      <div className="container mx-auto max-w-6xl">
 
         {/* VOLVER */}
 
@@ -228,226 +156,333 @@ export function DebtQuery({
           onClick={onBack}
           className="flex items-center gap-2 text-[#1e5a8e] hover:text-[#4fc3f7] mb-6"
         >
+
           <ArrowLeft className="w-5 h-5" />
+
           Volver al Dashboard
+
         </button>
 
-        {/* CARD */}
+        {/* BUSQUEDA */}
 
-        <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
 
-          {/* HEADER */}
+          <div className="flex items-center gap-3 mb-6">
 
-          <div className="flex items-center justify-between mb-6">
+            <DollarSign className="w-8 h-8 text-[#1e5a8e]" />
 
-            <div className="flex items-center gap-3">
-              <DollarSign className="w-8 h-8 text-[#1e5a8e]" />
+            <h2 className="text-3xl text-[#1e3a5f]">
 
-              <h2 className="text-3xl text-[#1e3a5f]">
-                Facturación / Deudas
-              </h2>
-            </div>
+              Consulta de Deuda
 
-            <button
-              onClick={loadAllDebts}
-              className="bg-gradient-to-r from-[#1e5a8e] to-[#4fc3f7] text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all"
-            >
-              Buscar Facturas
-            </button>
+            </h2>
+
           </div>
 
-          {/* BUSCADOR */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 
-          <div className="relative mb-6">
+            {/* CI */}
 
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#546e7a]" />
+            <div>
 
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) =>
-                setSearchTerm(
-                  e.target.value
-                )
-              }
-              placeholder="Buscar por cliente o medidor..."
-              className="w-full pl-11 pr-4 py-3 bg-[#f1f8fb] border-2 border-[#b3e5fc] rounded-lg"
-            />
+              <label className="block text-[#1e3a5f] mb-2">
+
+                Cédula de Identidad
+
+              </label>
+
+              <input
+                type="text"
+                value={ci}
+                onChange={(e) =>
+                  setCI(
+                    e.target.value
+                  )
+                }
+                placeholder="Ingrese CI"
+                className="w-full px-4 py-3 bg-[#f1f8fb] border-2 border-[#b3e5fc] rounded-lg focus:outline-none focus:border-[#4fc3f7]"
+              />
+
+            </div>
+
+            {/* MEDIDOR */}
+
+            <div>
+
+              <label className="block text-[#1e3a5f] mb-2">
+
+                Código Medidor
+
+              </label>
+
+              <input
+                type="text"
+                value={codigoMedidor}
+                onChange={(e) =>
+                  setCodigoMedidor(
+                    e.target.value
+                  )
+                }
+                placeholder="Ej: MED-1001"
+                className="w-full px-4 py-3 bg-[#f1f8fb] border-2 border-[#b3e5fc] rounded-lg focus:outline-none focus:border-[#4fc3f7]"
+              />
+
+            </div>
+
           </div>
 
-          {/* LOADING */}
+          {/* BOTON */}
 
-          {loading && (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-10 h-10 animate-spin text-[#1e5a8e]" />
-            </div>
-          )}
+          <button
+            onClick={handleSearch}
+            disabled={loading}
+            className="flex items-center gap-2 bg-gradient-to-r from-[#1e5a8e] to-[#4fc3f7] text-white px-6 py-3 rounded-lg hover:shadow-lg disabled:opacity-50"
+          >
 
-          {/* TABLA */}
+            <Search className="w-5 h-5" />
 
-          {!loading && (
-            <div className="overflow-x-auto">
+            {loading
+              ? "Consultando..."
+              : "Buscar"}
 
-              <table className="w-full">
+          </button>
 
-                <thead>
-                  <tr className="border-b-2 border-[#b3e5fc]">
+          {/* ERROR */}
 
-                    <th className="text-left py-3 px-4 text-[#1e3a5f]">
-                      Cliente
-                    </th>
+          {error && (
 
-                    <th className="text-left py-3 px-4 text-[#1e3a5f]">
-                      Medidor
-                    </th>
+            <div className="mt-4 bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-lg">
 
-                    <th className="text-left py-3 px-4 text-[#1e3a5f]">
-                      Total Deuda
-                    </th>
-
-                    <th className="text-left py-3 px-4 text-[#1e3a5f]">
-                      Facturas Pendientes
-                    </th>
-
-                    <th className="text-left py-3 px-4 text-[#1e3a5f]">
-                      Detalle
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-
-                  {filteredDebts.map(
-                    (debt, index) => (
-                      <tr
-                        key={index}
-                        className="border-b border-[#e3f2fd] hover:bg-[#f1f8fb]"
-                      >
-
-                        <td className="py-4 px-4 text-[#1e3a5f]">
-                          {
-                            debt.nombre_cliente
-                          }{" "}
-                          {
-                            debt.apellido_cliente
-                          }
-                        </td>
-
-                        <td className="py-4 px-4 text-[#546e7a]">
-                          {
-                            debt.codigo_medidor
-                          }
-                        </td>
-
-                        <td className="py-4 px-4 text-[#1e3a5f] font-semibold">
-                          Bs.{" "}
-                          {debt.total_deuda.toFixed(
-                            2
-                          )}
-                        </td>
-
-                        <td className="py-4 px-4">
-
-                          <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm">
-
-                            {
-                              debt.cantidad_facturas_pendientes
-                            }
-
-                          </span>
-
-                        </td>
-
-                        <td className="py-4 px-4">
-
-                          <div className="space-y-2">
-
-                            {debt.facturas.map(
-                              (
-                                factura,
-                                idx
-                              ) => (
-                                <div
-                                  key={idx}
-                                  className="bg-[#f1f8fb] rounded-lg p-3"
-                                >
-
-                                  <div className="flex justify-between items-center">
-
-                                    <div>
-
-                                      <p className="text-[#1e3a5f] text-sm">
-                                        {
-                                          factura.periodo
-                                        }
-                                      </p>
-
-                                      <p className="text-xs text-[#546e7a]">
-                                        Vence:
-                                        {" "}
-                                        {new Date(
-                                          factura.fecha_vencimiento
-                                        ).toLocaleDateString(
-                                          "es-ES"
-                                        )}
-                                      </p>
-
-                                    </div>
-
-                                    <div className="text-right">
-
-                                      <p className="text-[#1e3a5f] font-semibold">
-                                        Bs.{" "}
-                                        {factura.monto.toFixed(
-                                          2
-                                        )}
-                                      </p>
-
-                                      <span
-                                        className={`inline-block px-2 py-1 rounded-full text-xs ${getStatusColor(
-                                          factura.estado
-                                        )}`}
-                                      >
-                                        {
-                                          factura.estado
-                                        }
-                                      </span>
-
-                                    </div>
-
-                                  </div>
-
-                                </div>
-                              )
-                            )}
-
-                          </div>
-
-                        </td>
-
-                      </tr>
-                    )
-                  )}
-
-                </tbody>
-
-              </table>
-
-              {!loading &&
-                filteredDebts.length ===
-                  0 && (
-                  <div className="text-center py-12 text-[#546e7a]">
-
-                    No se encontraron facturas
-
-                  </div>
-                )}
+              {error}
 
             </div>
+
           )}
 
         </div>
+
+        {/* RESULTADO */}
+
+        {consulta && (
+
+          <div className="space-y-6">
+
+            {/* RESUMEN */}
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+
+              <div className="flex items-start justify-between mb-6">
+
+                <div>
+
+                  <h3 className="text-2xl text-[#1e3a5f] mb-1">
+
+                    {consulta.nombre_cliente}
+                    {" "}
+                    {consulta.apellido_cliente}
+
+                  </h3>
+
+                  <p className="text-[#546e7a]">
+
+                    Medidor:
+                    {" "}
+                    {consulta.codigo_medidor}
+
+                  </p>
+
+                </div>
+
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* DEUDA */}
+
+                <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+
+                  <DollarSign className="w-6 h-6 text-red-600 mb-2" />
+
+                  <p className="text-sm text-[#546e7a] mb-1">
+
+                    Deuda Total
+
+                  </p>
+
+                  <p className="text-3xl text-red-600">
+
+                    Bs.
+                    {" "}
+                    {consulta.total_deuda}
+
+                  </p>
+
+                </div>
+
+                {/* FACTURAS */}
+
+                <div className="bg-[#f1f8fb] border-2 border-[#b3e5fc] rounded-lg p-4">
+
+                  <AlertCircle className="w-6 h-6 text-[#1e5a8e] mb-2" />
+
+                  <p className="text-sm text-[#546e7a] mb-1">
+
+                    Facturas Pendientes
+
+                  </p>
+
+                  <p className="text-3xl text-[#1e3a5f]">
+
+                    {consulta.cantidad_facturas_pendientes}
+
+                  </p>
+
+                </div>
+
+                {/* MEDIDOR */}
+
+                <div className="bg-[#f1f8fb] border-2 border-[#b3e5fc] rounded-lg p-4">
+
+                  <Droplet className="w-6 h-6 text-[#1e5a8e] mb-2" />
+
+                  <p className="text-sm text-[#546e7a] mb-1">
+
+                    Código Medidor
+
+                  </p>
+
+                  <p className="text-xl text-[#1e3a5f]">
+
+                    {consulta.codigo_medidor}
+
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* FACTURAS */}
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+
+              <h4 className="text-2xl text-[#1e3a5f] mb-6">
+
+                Facturas
+
+              </h4>
+
+              {consulta.facturas.length > 0 ? (
+
+                <div className="space-y-4">
+
+                  {consulta.facturas.map(
+                    (
+                      factura,
+                      index
+                    ) => {
+
+                      const config =
+                        getStatusColor(
+                          factura.estado
+                        );
+
+                      const Icon =
+                        config.icon;
+
+                      return (
+
+                        <div
+                          key={index}
+                          className={`${config.bg} border-2 ${config.border} rounded-xl p-5`}
+                        >
+
+                          <div className="flex justify-between items-center">
+
+                            <div className="flex items-center gap-3">
+
+                              <Icon
+                                className={`w-6 h-6 ${config.text}`}
+                              />
+
+                              <div>
+
+                                <p className="text-lg text-[#1e3a5f]">
+
+                                  {factura.periodo}
+
+                                </p>
+
+                                <p className="text-sm text-[#546e7a]">
+
+                                  Vence:
+                                  {" "}
+                                  {new Date(
+                                    factura.fecha_vencimiento
+                                  ).toLocaleDateString(
+                                    "es-ES"
+                                  )}
+
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                            <div className="text-right">
+
+                              <p className="text-2xl text-[#1e3a5f]">
+
+                                Bs.
+                                {" "}
+                                {factura.monto}
+
+                              </p>
+
+                              <span
+                                className={`text-sm ${config.text}`}
+                              >
+
+                                {factura.estado}
+
+                              </span>
+
+                            </div>
+
+                          </div>
+
+                        </div>
+                      );
+                    }
+                  )}
+
+                </div>
+
+              ) : (
+
+                <div className="text-center py-10">
+
+                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+
+                  <p className="text-green-600 text-xl">
+
+                    No tiene facturas pendientes
+
+                  </p>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </div>
+
+        )}
+
       </div>
+
     </div>
   );
 }
