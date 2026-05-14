@@ -74,7 +74,7 @@ export function Dashboard({ onLogout, onNavigate }: DashboardProps) {
       page: "cuts",
     },
     {
-      title: "Consulta de Deuda",
+      title: "Consulta de Facturas",
       description: "Verificar estado de cuenta",
       icon: DollarSign,
       color: "bg-gradient-to-br from-[#26c6da] to-[#80deea]",
