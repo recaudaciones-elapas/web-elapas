@@ -9,7 +9,6 @@ import {
   Mail,
   Phone,
   CreditCard,
-  AlertCircle,
 } from "lucide-react";
 
 import {
@@ -46,14 +45,16 @@ interface Reading {
   consumo: number;
 }
 
+interface DebtData {
+  deuda_total?: number;
+  total_deuda?: number;
+  deuda?: number;
+}
+
 interface ClientDetailProps {
   clientId: string;
   onBack: () => void;
 }
-
-// ========================================
-// COMPONENTE
-// ========================================
 
 export function ClientDetail({
   clientId,
@@ -73,6 +74,9 @@ export function ClientDetail({
   const [readings, setReadings] =
     useState<Reading[]>([]);
 
+  const [debt, setDebt] =
+    useState<number>(0);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -87,7 +91,7 @@ export function ClientDetail({
     "https://fastapi-app-latest-ride.onrender.com/api/v1";
 
   // ========================================
-  // CARGAR DATOS
+  // FETCH DATA
   // ========================================
 
   useEffect(() => {
@@ -104,137 +108,202 @@ export function ClientDetail({
           localStorage.getItem("token");
 
         // ========================================
-        // CLIENTE
+        // 1. BUSCAR CLIENTE POR CI
         // ========================================
 
-        const clientResponse =
+        const searchResponse =
           await fetch(
-            `${API_BASE}/clientes/${clientId}`,
+            `${API_BASE}/clientes/buscar?q=${clientId}`,
             {
+              method: "GET",
               headers: {
+                "Content-Type":
+                  "application/json",
                 Authorization:
                   `Bearer ${token}`,
               },
             }
           );
 
-        if (!clientResponse.ok) {
+        if (!searchResponse.ok) {
 
           throw new Error(
-            "Error al cargar cliente"
+            "No se pudo buscar el cliente"
           );
         }
 
-        const clientData =
-          await clientResponse.json();
+        const searchData =
+          await searchResponse.json();
+
+        if (
+          !Array.isArray(searchData) ||
+          searchData.length === 0
+        ) {
+
+          throw new Error(
+            "Cliente no encontrado"
+          );
+        }
+
+        // ========================================
+        // CLIENTE REAL
+        // ========================================
+
+        const clienteReal =
+          searchData[0];
+
+        setClient(clienteReal);
+
+        const realClientId =
+          clienteReal.id_cliente;
 
         console.log(
           "CLIENTE:",
-          clientData
+          clienteReal
         );
 
-        setClient(clientData);
-
         // ========================================
-        // MEDIDOR
+        // 2. DEUDA
         // ========================================
 
-        const meterResponse =
-          await fetch(
-            `${API_BASE}/medidores/cliente/${clientId}`,
-            {
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-            }
-          );
+        try {
 
-        if (meterResponse.ok) {
+          const debtResponse =
+            await fetch(
+              `${API_BASE}/consulta-deuda/${realClientId}`,
+              {
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
+              }
+            );
 
-          const meterData =
-            await meterResponse.json();
+          if (debtResponse.ok) {
+
+            const debtData: DebtData =
+              await debtResponse.json();
+
+            console.log(
+              "DEUDA:",
+              debtData
+            );
+
+            setDebt(
+              Number(
+                debtData.deuda_total ||
+                debtData.total_deuda ||
+                debtData.deuda ||
+                0
+              )
+            );
+          }
+
+        } catch (err) {
 
           console.log(
-            "MEDIDOR:",
-            meterData
+            "Sin deuda"
           );
+        }
 
-          let medidor = null;
+        // ========================================
+        // 3. MEDIDOR
+        // ========================================
 
-          if (
-            Array.isArray(meterData)
-          ) {
+        try {
 
-            medidor =
-              meterData[0];
+          const meterResponse =
+            await fetch(
+              `${API_BASE}/medidores/cliente/${realClientId}`,
+              {
+                method: "GET",
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
+              }
+            );
 
-          } else {
+          if (meterResponse.ok) {
 
-            medidor =
-              meterData;
-          }
+            const meterData =
+              await meterResponse.json();
 
-          setMeter(medidor);
-
-          // ========================================
-          // LECTURAS
-          // ========================================
-
-          if (
-            medidor?.id_medidor
-          ) {
-
-            const readingsResponse =
-              await fetch(
-                `${API_BASE}/lecturas/medidor/${medidor.id_medidor}`,
-                {
-                  headers: {
-                    Authorization:
-                      `Bearer ${token}`,
-                  },
-                }
-              );
+            console.log(
+              "MEDIDORES:",
+              meterData
+            );
 
             if (
-              readingsResponse.ok
+              Array.isArray(meterData) &&
+              meterData.length > 0
             ) {
 
-              const readingsData =
-                await readingsResponse.json();
+              const medidor =
+                meterData[0];
 
-              console.log(
-                "LECTURAS:",
-                readingsData
-              );
+              setMeter(medidor);
 
-              let lecturas =
-                Array.isArray(
+              // ========================================
+              // 4. LECTURAS
+              // ========================================
+
+              const readingsResponse =
+                await fetch(
+                  `${API_BASE}/lecturas/medidor/${medidor.id_medidor}`,
+                  {
+                    method: "GET",
+                    headers: {
+                      Authorization:
+                        `Bearer ${token}`,
+                    },
+                  }
+                );
+
+              if (
+                readingsResponse.ok
+              ) {
+
+                const readingsData =
+                  await readingsResponse.json();
+
+                console.log(
+                  "LECTURAS:",
                   readingsData
-                )
-                  ? readingsData
-                  : [];
+                );
 
-              // ORDENAR DESCENDENTE
+                let lecturas =
+                  Array.isArray(
+                    readingsData
+                  )
+                    ? readingsData
+                    : [];
 
-              lecturas.sort(
-                (
-                  a: Reading,
-                  b: Reading
-                ) =>
-                  new Date(
-                    b.fecha
-                  ).getTime() -
-                  new Date(
-                    a.fecha
-                  ).getTime()
-              );
+                lecturas.sort(
+                  (
+                    a: Reading,
+                    b: Reading
+                  ) =>
+                    new Date(
+                      b.fecha
+                    ).getTime() -
+                    new Date(
+                      a.fecha
+                    ).getTime()
+                );
 
-              setReadings(
-                lecturas
-              );
+                setReadings(
+                  lecturas
+                );
+              }
             }
           }
+
+        } catch (err) {
+
+          console.log(
+            "Sin medidor"
+          );
         }
 
       } catch (err: any) {
@@ -243,7 +312,7 @@ export function ClientDetail({
 
         setError(
           err.message ||
-            "Error al cargar datos"
+          "Error al cargar datos"
         );
 
       } finally {
@@ -252,7 +321,10 @@ export function ClientDetail({
       }
     };
 
-    fetchData();
+    if (clientId) {
+
+      fetchData();
+    }
 
   }, [clientId]);
 
@@ -302,7 +374,7 @@ export function ClientDetail({
   }
 
   // ========================================
-  // CLIENTE NO EXISTE
+  // CLIENTE NO ENCONTRADO
   // ========================================
 
   if (!client) {
@@ -336,7 +408,7 @@ export function ClientDetail({
 
       <div className="container mx-auto max-w-6xl">
 
-        {/* BOTON VOLVER */}
+        {/* VOLVER */}
 
         <button
           onClick={onBack}
@@ -353,49 +425,57 @@ export function ClientDetail({
 
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
 
-          <div className="flex items-start gap-4 mb-6">
+          <div className="flex items-start justify-between gap-4 mb-6">
 
-            <div className="w-16 h-16 bg-gradient-to-br from-[#1e5a8e] to-[#4fc3f7] rounded-full flex items-center justify-center">
+            <div className="flex gap-4">
 
-              <User className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 bg-gradient-to-br from-[#1e5a8e] to-[#4fc3f7] rounded-full flex items-center justify-center">
 
-            </div>
+                <User className="w-8 h-8 text-white" />
 
-            <div className="flex-1">
+              </div>
 
-              <h2 className="text-3xl text-[#1e3a5f] mb-2">
+              <div>
 
-                {client.nombre} {client.apellido}
+                <h2 className="text-3xl text-[#1e3a5f]">
 
-              </h2>
+                  {client.nombre} {client.apellido}
 
-              <div className="flex items-center gap-2 text-[#546e7a]">
+                </h2>
 
-                <CreditCard className="w-4 h-4" />
+                <div className="flex items-center gap-2 text-[#546e7a] mt-2">
 
-                CI: {client.ci}
+                  <CreditCard className="w-4 h-4" />
+
+                  CI: {client.ci}
+
+                </div>
 
               </div>
 
             </div>
 
-            <span
-              className={`px-4 py-2 rounded-full font-semibold ${
-                estadoActivo
-                  ? "bg-green-100 text-green-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
+            <div className="text-right">
 
-              {client.estado}
+              <p className="text-sm text-[#546e7a]">
+                Deuda Actual
+              </p>
 
-            </span>
+              <p className="text-3xl text-red-600">
+
+                Bs. {debt.toFixed(2)}
+
+              </p>
+
+            </div>
 
           </div>
 
-          {/* INFORMACION */}
+          {/* INFO */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* DIRECCION */}
 
             <div className="bg-[#f1f8fb] rounded-lg p-4">
 
@@ -417,6 +497,8 @@ export function ClientDetail({
               </p>
 
             </div>
+
+            {/* CONTACTO */}
 
             <div className="bg-[#f1f8fb] rounded-lg p-4">
 
@@ -450,63 +532,92 @@ export function ClientDetail({
 
             </div>
 
-          </div>
+            {/* MEDIDOR */}
 
-        </div>
+            <div className="bg-[#f1f8fb] rounded-lg p-4">
 
-        {/* MEDIDOR */}
+              <div className="flex items-center gap-3 mb-3">
 
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <Gauge className="w-5 h-5 text-[#1e5a8e]" />
 
-          <div className="flex items-center gap-3 mb-4">
-
-            <Gauge className="w-6 h-6 text-[#1e5a8e]" />
-
-            <h3 className="text-2xl text-[#1e3a5f]">
-
-              Información del Medidor
-
-            </h3>
-
-          </div>
-
-          {meter ? (
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              <div>
-
-                <p className="text-sm text-[#546e7a]">
-                  Código
-                </p>
-
-                <p className="text-[#1e3a5f]">
-                  {meter.codigo}
-                </p>
+                <h3 className="text-[#1e3a5f]">
+                  Medidor
+                </h3>
 
               </div>
 
-              <div>
+              {meter ? (
 
-                <p className="text-sm text-[#546e7a]">
-                  Estado
+                <>
+                  <p className="text-[#546e7a]">
+
+                    Código:
+                    {" "}
+                    {meter.codigo}
+
+                  </p>
+
+                  <p className="text-[#546e7a]">
+
+                    Estado:
+                    {" "}
+                    {meter.estado}
+
+                  </p>
+                </>
+
+              ) : (
+
+                <p className="text-[#546e7a]">
+                  Sin medidor registrado
                 </p>
-
-                <p className="text-[#1e3a5f]">
-                  {meter.estado}
-                </p>
-
-              </div>
+              )}
 
             </div>
 
-          ) : (
+            {/* ESTADO */}
 
-            <p className="text-[#546e7a]">
-              Sin medidor registrado
-            </p>
+            <div className="bg-[#f1f8fb] rounded-lg p-4">
 
-          )}
+              <div className="flex items-center gap-3 mb-3">
+
+                <DollarSign className="w-5 h-5 text-[#1e5a8e]" />
+
+                <h3 className="text-[#1e3a5f]">
+                  Estado de Cuenta
+                </h3>
+
+              </div>
+
+              <p
+                className={
+                  debt > 0
+                    ? "text-red-600"
+                    : "text-green-600"
+                }
+              >
+
+                {debt > 0
+                  ? "Con deuda pendiente"
+                  : "Al día"}
+
+              </p>
+
+              <p
+                className={`mt-2 ${
+                  estadoActivo
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+
+                Cliente {client.estado}
+
+              </p>
+
+            </div>
+
+          </div>
 
         </div>
 

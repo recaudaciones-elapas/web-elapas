@@ -12,10 +12,6 @@ import {
   useState,
 } from "react";
 
-// ========================================
-// INTERFACE
-// ========================================
-
 interface Client {
   id_cliente: string;
   nombre: string;
@@ -25,29 +21,17 @@ interface Client {
   telefono: string;
   email: string;
   estado: string;
-  created_at?: string;
 }
 
 interface ClientListProps {
-  onViewDetail: (
-    clientId: string
-  ) => void;
-
+  onViewDetail: (clientId: string) => void;
   onBack: () => void;
 }
-
-// ========================================
-// COMPONENTE
-// ========================================
 
 export function ClientList({
   onViewDetail,
   onBack,
 }: ClientListProps) {
-
-  // ========================================
-  // ESTADOS
-  // ========================================
 
   const [searchTerm, setSearchTerm] =
     useState("");
@@ -61,38 +45,8 @@ export function ClientList({
   const [error, setError] =
     useState("");
 
-  // MODAL
-  const [
-    showRegisterForm,
-    setShowRegisterForm,
-  ] = useState(false);
-
-  // CLIENTE EDITANDO
-  const [
-    editingClient,
-    setEditingClient,
-  ] = useState<Client | null>(
-    null
-  );
-
-  // FORMULARIO
-  const [formData, setFormData] =
-    useState({
-      nombre: "",
-      apellido: "",
-      ci: "",
-      direccion: "",
-      telefono: "",
-      email: "",
-      estado: "activo",
-    });
-
-  // ========================================
-  // API URL
-  // ========================================
-
   const API_URL =
-    "https://fastapi-app-latest-ride.onrender.com/api/v1/clientes/";
+    "https://fastapi-app-latest-ride.onrender.com/api/v1/clientes";
 
   // ========================================
   // OBTENER CLIENTES
@@ -104,30 +58,23 @@ export function ClientList({
 
       setLoading(true);
 
-      setError("");
-
       const token =
-        localStorage.getItem(
-          "token"
-        );
+        localStorage.getItem("token");
 
       const response =
         await fetch(API_URL, {
           method: "GET",
-
           headers: {
             "Content-Type":
               "application/json",
-
             Authorization:
               `Bearer ${token}`,
           },
         });
 
       if (!response.ok) {
-
         throw new Error(
-          "Error al obtener clientes"
+          "Error al cargar clientes"
         );
       }
 
@@ -135,38 +82,25 @@ export function ClientList({
         await response.json();
 
       console.log(
-        "CLIENTES:",
+        "CLIENTES API:",
         data
       );
 
-      // VALIDAR RESPUESTA
+      let clientes: Client[] = [];
 
-      if (
-        Array.isArray(data)
-      ) {
-
-        setClients(data);
-
+      if (Array.isArray(data)) {
+        clientes = data;
       } else if (
-        Array.isArray(
-          data.clientes
-        )
+        Array.isArray(data.clientes)
       ) {
-
-        setClients(
-          data.clientes
-        );
-
+        clientes = data.clientes;
       } else if (
         Array.isArray(data.items)
       ) {
-
-        setClients(data.items);
-
-      } else {
-
-        setClients([]);
+        clientes = data.items;
       }
+
+      setClients(clientes);
 
     } catch (err: any) {
 
@@ -174,7 +108,7 @@ export function ClientList({
 
       setError(
         err.message ||
-          "Error al cargar clientes"
+          "Error al obtener clientes"
       );
 
     } finally {
@@ -183,132 +117,58 @@ export function ClientList({
     }
   };
 
-  // ========================================
-  // USE EFFECT
-  // ========================================
-
   useEffect(() => {
-
     fetchClients();
-
   }, []);
 
   // ========================================
-  // FILTRAR CLIENTES
+  // FILTRO
   // ========================================
 
   const filteredClients =
     clients.filter((client) => {
 
-      return (
+      const text =
+        searchTerm.toLowerCase();
 
+      return (
         client.nombre
           ?.toLowerCase()
-          .includes(
-            searchTerm.toLowerCase()
-          ) ||
-
+          .includes(text) ||
         client.apellido
           ?.toLowerCase()
-          .includes(
-            searchTerm.toLowerCase()
-          ) ||
-
+          .includes(text) ||
         client.ci
           ?.toLowerCase()
-          .includes(
-            searchTerm.toLowerCase()
-          )
+          .includes(text)
       );
     });
-
-  // ========================================
-  // NUEVO CLIENTE
-  // ========================================
-
-  const handleNewClient = () => {
-
-    setEditingClient(null);
-
-    setFormData({
-      nombre: "",
-      apellido: "",
-      ci: "",
-      direccion: "",
-      telefono: "",
-      email: "",
-      estado: "activo",
-    });
-
-    setShowRegisterForm(true);
-  };
-
-  // ========================================
-  // EDITAR
-  // ========================================
-
-  const handleEdit = (
-    client: Client
-  ) => {
-
-    setEditingClient(client);
-
-    setFormData({
-      nombre:
-        client.nombre || "",
-
-      apellido:
-        client.apellido || "",
-
-      ci: client.ci || "",
-
-      direccion:
-        client.direccion || "",
-
-      telefono:
-        client.telefono || "",
-
-      email:
-        client.email || "",
-
-      estado:
-        client.estado ||
-        "activo",
-    });
-
-    setShowRegisterForm(true);
-  };
 
   // ========================================
   // ELIMINAR
   // ========================================
 
   const handleDelete =
-    async (
-      id: string
-    ) => {
+    async (id: string) => {
 
-      const confirmDelete =
-        window.confirm(
+      if (
+        !window.confirm(
           "¿Eliminar cliente?"
-        );
-
-      if (!confirmDelete)
+        )
+      ) {
         return;
+      }
 
       try {
 
         const token =
-          localStorage.getItem(
-            "token"
-          );
+          localStorage.getItem("token");
 
         const response =
           await fetch(
-            `${API_URL}${id}`,
+            `${API_URL}/${id}`,
             {
               method: "DELETE",
-
               headers: {
                 Authorization:
                   `Bearer ${token}`,
@@ -317,9 +177,8 @@ export function ClientList({
           );
 
         if (!response.ok) {
-
           throw new Error(
-            "Error al eliminar"
+            "Error al eliminar cliente"
           );
         }
 
@@ -329,143 +188,7 @@ export function ClientList({
 
         console.error(err);
 
-        alert(
-          err.message
-        );
-      }
-    };
-
-  // ========================================
-  // INPUTS
-  // ========================================
-
-  const handleChange = (
-    e: React.ChangeEvent<
-      | HTMLInputElement
-      | HTMLSelectElement
-    >
-  ) => {
-
-    setFormData({
-      ...formData,
-
-      [e.target.name]:
-        e.target.value,
-    });
-  };
-
-  // ========================================
-  // GUARDAR
-  // ========================================
-
-  const handleSubmit =
-    async (
-      e: React.FormEvent
-    ) => {
-
-      e.preventDefault();
-
-      try {
-
-        const token =
-          localStorage.getItem(
-            "token"
-          );
-
-        // =========================
-        // EDITAR
-        // =========================
-
-        if (
-          editingClient
-        ) {
-
-          const response =
-            await fetch(
-              `${API_URL}${editingClient.id_cliente}`,
-              {
-                method: "PUT",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-
-                  Authorization:
-                    `Bearer ${token}`,
-                },
-
-                body: JSON.stringify(
-                  formData
-                ),
-              }
-            );
-
-          if (
-            !response.ok
-          ) {
-
-            throw new Error(
-              "Error al actualizar cliente"
-            );
-          }
-        }
-
-        // =========================
-        // CREAR
-        // =========================
-
-        else {
-
-          const response =
-            await fetch(
-              API_URL,
-              {
-                method:
-                  "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-
-                  Authorization:
-                    `Bearer ${token}`,
-                },
-
-                body: JSON.stringify(
-                  formData
-                ),
-              }
-            );
-
-          if (
-            !response.ok
-          ) {
-
-            throw new Error(
-              "Error al registrar cliente"
-            );
-          }
-        }
-
-        // CERRAR
-        setShowRegisterForm(
-          false
-        );
-
-        setEditingClient(
-          null
-        );
-
-        // RECARGAR
-        fetchClients();
-
-      } catch (err: any) {
-
-        console.error(err);
-
-        alert(
-          err.message
-        );
+        alert(err.message);
       }
     };
 
@@ -485,14 +208,9 @@ export function ClientList({
           onClick={onBack}
           className="flex items-center gap-2 text-[#1e5a8e] mb-6"
         >
-
           <ArrowLeft className="w-5 h-5" />
-
           Volver
-
         </button>
-
-        {/* CARD */}
 
         <div className="bg-white rounded-xl shadow-lg p-6">
 
@@ -501,22 +219,14 @@ export function ClientList({
           <div className="flex items-center justify-between mb-6">
 
             <h2 className="text-3xl text-[#1e3a5f]">
-
               Clientes
-
             </h2>
 
             <button
-              onClick={
-                handleNewClient
-              }
               className="flex items-center gap-2 bg-gradient-to-r from-[#1e5a8e] to-[#4fc3f7] text-white px-5 py-3 rounded-lg"
             >
-
               <Plus className="w-5 h-5" />
-
               Registrar
-
             </button>
 
           </div>
@@ -535,7 +245,7 @@ export function ClientList({
                   e.target.value
                 )
               }
-              placeholder="Buscar..."
+              placeholder="Buscar cliente..."
               className="w-full pl-11 pr-4 py-3 border-2 rounded-lg"
             />
 
@@ -544,406 +254,170 @@ export function ClientList({
           {/* LOADING */}
 
           {loading && (
-
             <div className="text-center py-10">
-
               Cargando...
-
             </div>
-
           )}
 
           {/* ERROR */}
 
-          {!loading &&
-            error && (
-
-              <div className="text-center text-red-600 py-10">
-
-                {error}
-
-              </div>
-            )}
+          {!loading && error && (
+            <div className="text-center text-red-600 py-10">
+              {error}
+            </div>
+          )}
 
           {/* TABLA */}
 
-          {!loading &&
-            !error && (
+          {!loading && !error && (
 
-              <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
 
-                <table className="w-full">
+              <table className="w-full">
 
-                  <thead>
+                <thead>
 
-                    <tr className="border-b">
+                  <tr className="border-b">
 
-                      <th className="text-left py-3 px-4">
-                        Nombre
-                      </th>
+                    <th className="text-left py-3 px-4">
+                      Nombre
+                    </th>
 
-                      <th className="text-left py-3 px-4">
-                        CI
-                      </th>
+                    <th className="text-left py-3 px-4">
+                      CI
+                    </th>
 
-                      <th className="text-left py-3 px-4">
-                        Dirección
-                      </th>
+                    <th className="text-left py-3 px-4">
+                      Dirección
+                    </th>
 
-                      <th className="text-left py-3 px-4">
-                        Teléfono
-                      </th>
+                    <th className="text-left py-3 px-4">
+                      Teléfono
+                    </th>
 
-                      <th className="text-left py-3 px-4">
-                        Email
-                      </th>
+                    <th className="text-left py-3 px-4">
+                      Estado
+                    </th>
 
-                      <th className="text-left py-3 px-4">
-                        Estado
-                      </th>
+                    <th className="text-center py-3 px-4">
+                      Acciones
+                    </th>
 
-                      <th className="text-center py-3 px-4">
-                        Acciones
-                      </th>
+                  </tr>
 
-                    </tr>
+                </thead>
 
-                  </thead>
+                <tbody>
 
-                  <tbody>
+                  {filteredClients.map(
+                    (client) => (
 
-                    {filteredClients.map(
-                      (
-                        client
-                      ) => (
+                      <tr
+                        key={
+                          client.id_cliente
+                        }
+                        className="border-b hover:bg-gray-50"
+                      >
 
-                        <tr
-                          key={
-                            client.id_cliente
-                          }
-                          className="border-b hover:bg-gray-50"
-                        >
+                        <td className="py-4 px-4">
 
-                          <td className="py-4 px-4">
+                          {client.nombre}{" "}
+                          {client.apellido}
 
-                            {
-                              client.nombre
-                            }{" "}
+                        </td>
 
-                            {
-                              client.apellido
-                            }
+                        <td className="py-4 px-4">
+                          {client.ci}
+                        </td>
 
-                          </td>
+                        <td className="py-4 px-4">
+                          {client.direccion}
+                        </td>
 
-                          <td className="py-4 px-4">
+                        <td className="py-4 px-4">
+                          {client.telefono}
+                        </td>
 
-                            {
-                              client.ci
-                            }
+                        <td className="py-4 px-4">
 
-                          </td>
+                          <span
+                            className={`font-semibold ${
+                              client.estado ===
+                              "activo"
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {client.estado}
+                          </span>
 
-                          <td className="py-4 px-4">
+                        </td>
 
-                            {
-                              client.direccion
-                            }
+                        <td className="py-4 px-4">
 
-                          </td>
+                          <div className="flex items-center justify-center gap-2">
 
-                          <td className="py-4 px-4">
+                            {/* VER */}
 
-                            {
-                              client.telefono
-                            }
+                            <button
+                              onClick={() => {
 
-                          </td>
+                                console.log(
+                                  "CLIENTE SELECCIONADO:",
+                                  client
+                                );
 
-                          <td className="py-4 px-4">
-
-                            {
-                              client.email
-                            }
-
-                          </td>
-
-                          <td className="py-4 px-4">
-
-                            <span
-                              className={`font-semibold ${
-                                client.estado ===
-                                "activo"
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
+                                // ENVIAR CI
+                                onViewDetail(client.ci);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                             >
 
-                              {
-                                client.estado
+                              <Eye className="w-4 h-4" />
+
+                            </button>
+
+                            {/* EDITAR */}
+
+                            <button
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+
+                            {/* ELIMINAR */}
+
+                            <button
+                              onClick={() =>
+                                handleDelete(
+                                  client.id_cliente
+                                )
                               }
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
 
-                            </span>
+                              <Trash2 className="w-4 h-4" />
 
-                          </td>
+                            </button>
 
-                          {/* BOTONES */}
+                          </div>
 
-                          <td className="py-4 px-4">
+                        </td>
 
-                            <div className="flex items-center justify-center gap-2">
+                      </tr>
+                    )
+                  )}
 
-                              {/* VER */}
+                </tbody>
 
-                              <button
-                                onClick={() =>
-                                  onViewDetail(
-                                    client.id_cliente
-                                  )
-                                }
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                              >
+              </table>
 
-                                <Eye className="w-4 h-4" />
-
-                              </button>
-
-                              {/* EDITAR */}
-
-                              <button
-                                onClick={() =>
-                                  handleEdit(
-                                    client
-                                  )
-                                }
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
-                              >
-
-                                <Edit className="w-4 h-4" />
-
-                              </button>
-
-                              {/* ELIMINAR */}
-
-                              <button
-                                onClick={() =>
-                                  handleDelete(
-                                    client.id_cliente
-                                  )
-                                }
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-
-                                <Trash2 className="w-4 h-4" />
-
-                              </button>
-
-                            </div>
-
-                          </td>
-
-                        </tr>
-                      )
-                    )}
-
-                  </tbody>
-
-                </table>
-
-                {/* SIN DATOS */}
-
-                {filteredClients.length ===
-                  0 && (
-
-                  <div className="text-center py-10">
-
-                    No hay clientes
-
-                  </div>
-                )}
-
-              </div>
-            )}
+            </div>
+          )}
 
         </div>
 
       </div>
-
-      {/* ======================================== */}
-      {/* MODAL */}
-      {/* ======================================== */}
-
-      {showRegisterForm && (
-
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl">
-
-            <h3 className="text-2xl mb-6">
-
-              {editingClient
-                ? "Editar Cliente"
-                : "Registrar Cliente"}
-
-            </h3>
-
-            <form
-              onSubmit={
-                handleSubmit
-              }
-              className="space-y-4"
-            >
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <input
-                  type="text"
-                  name="nombre"
-                  value={
-                    formData.nombre
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="Nombre"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  required
-                />
-
-                <input
-                  type="text"
-                  name="apellido"
-                  value={
-                    formData.apellido
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="Apellido"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  required
-                />
-
-                <input
-                  type="text"
-                  name="ci"
-                  value={
-                    formData.ci
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="CI"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  required
-                />
-
-                <input
-                  type="text"
-                  name="telefono"
-                  value={
-                    formData.telefono
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="Teléfono"
-                  className="w-full px-4 py-3 border rounded-lg"
-                />
-
-                <input
-                  type="email"
-                  name="email"
-                  value={
-                    formData.email
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="Email"
-                  className="w-full px-4 py-3 border rounded-lg"
-                />
-
-                <select
-                  name="estado"
-                  value={
-                    formData.estado
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  className="w-full px-4 py-3 border rounded-lg"
-                >
-
-                  <option value="activo">
-                    Activo
-                  </option>
-
-                  <option value="suspendido">
-                    Suspendido
-                  </option>
-
-                  <option value="inactivo">
-                    Inactivo
-                  </option>
-
-                </select>
-
-                <input
-                  type="text"
-                  name="direccion"
-                  value={
-                    formData.direccion
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="Dirección"
-                  className="w-full px-4 py-3 border rounded-lg md:col-span-2"
-                />
-
-              </div>
-
-              <div className="flex gap-3 pt-4">
-
-                <button
-                  type="button"
-                  onClick={() => {
-
-                    setShowRegisterForm(
-                      false
-                    );
-
-                    setEditingClient(
-                      null
-                    );
-                  }}
-                  className="flex-1 py-3 bg-gray-200 rounded-lg"
-                >
-
-                  Cancelar
-
-                </button>
-
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-gradient-to-r from-[#1e5a8e] to-[#4fc3f7] text-white rounded-lg"
-                >
-
-                  {editingClient
-                    ? "Actualizar"
-                    : "Guardar"}
-
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
-      )}
 
     </div>
   );
